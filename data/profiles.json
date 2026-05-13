@@ -1,0 +1,380 @@
+{
+  "generation": "Generation CH65",
+  "profiles": [
+    {
+      "username": "antonio-m",
+      "name": "Antonio M.",
+      "role": "Frontend Developer",
+      "profilePicture": "assets/avatars/antonio.png",
+      "memories": [
+        {
+          "id": "antonio-from-sam-01",
+          "author": "sam-p",
+          "body": "Antonio turned a fuzzy product note into a polished interface plan. His reviews are direct, respectful, and always leave the codebase easier to work in.",
+          "image": "assets/memories/team-handoff.webp",
+          "heartCount": 18,
+          "createdAt": "2026-05-04T16:20:00.000Z",
+          "comments": [
+            {
+              "profile": "kim-n",
+              "body": "The calmest handoff I have seen this quarter.",
+              "createdAt": "2026-05-04T17:10:00.000Z"
+            },
+            {
+              "profile": "anaid-r",
+              "body": "Great balance between design polish and practical scope.",
+              "createdAt": "2026-05-04T17:42:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "anaid-r",
+      "name": "Anaid R.",
+      "role": "QA Engineer",
+      "profilePicture": "assets/avatars/anaid.png",
+      "memories": [
+        {
+          "id": "anaid-from-antonio-01",
+          "author": "antonio-m",
+          "body": "Anaid kept the release grounded with calm, useful testing notes. She made every edge case feel manageable without slowing the team down.",
+          "image": "assets/memories/qa-notes.webp",
+          "heartCount": 30,
+          "createdAt": "2026-05-09T19:15:00.000Z",
+          "comments": [
+            {
+              "profile": "sam-p",
+              "body": "Her bug reports read like tiny implementation plans.",
+              "createdAt": "2026-05-09T20:05:00.000Z"
+            },
+            {
+              "profile": "nat-g",
+              "body": "Strong ownership and zero drama.",
+              "createdAt": "2026-05-09T20:18:00.000Z"
+            }
+          ]
+        },
+        {
+          "id": "anaid-from-jose-01",
+          "author": "jose-l",
+          "body": "She noticed the accessibility regression before it reached staging and paired with me until the fix was merged.",
+          "image": "assets/memories/accessibility.webp",
+          "heartCount": 22,
+          "createdAt": "2026-04-27T17:30:00.000Z",
+          "comments": [
+            {
+              "profile": "luis-f",
+              "body": "That save made the demo feel effortless.",
+              "createdAt": "2026-04-27T18:10:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "daniela-s",
+      "name": "Daniela S.",
+      "role": "Product Strategist",
+      "profilePicture": "assets/avatars/daniela.PNG",
+      "memories": [
+        {
+          "id": "daniela-from-cleyri-01",
+          "author": "cleyri-v",
+          "body": "Daniela turns scattered product conversations into decisions people can actually execute. Her notes make every next step feel obvious.",
+          "image": "assets/memories/design-flow.webp",
+          "heartCount": 26,
+          "createdAt": "2026-05-08T18:20:00.000Z",
+          "comments": [
+            {
+              "profile": "julio-c",
+              "body": "She makes scope feel calm, even when the ask is messy.",
+              "createdAt": "2026-05-08T19:05:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "julio-c",
+      "name": "Julio C.",
+      "role": "Backend Developer",
+      "profilePicture": "assets/avatars/julio.png",
+      "memories": [
+        {
+          "id": "julio-from-diego-01",
+          "author": "diego-p",
+          "body": "Julio built the service contract with the kind of clarity that saves everyone downstream. The integration felt boring in the best possible way.",
+          "image": "assets/memories/api-contract.webp",
+          "heartCount": 24,
+          "createdAt": "2026-05-07T17:40:00.000Z",
+          "comments": [
+            {
+              "profile": "antonio-m",
+              "body": "That API shape made the frontend straightforward.",
+              "createdAt": "2026-05-07T18:25:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "cleyri-v",
+      "name": "Cleyri V.",
+      "role": "UX Researcher",
+      "profilePicture": "assets/avatars/cleyri.png",
+      "memories": [
+        {
+          "id": "cleyri-from-daniela-01",
+          "author": "daniela-s",
+          "body": "Cleyri found the user insight hiding underneath all the noise. The final recommendation was concise, human, and immediately useful.",
+          "image": "assets/memories/retro.webp",
+          "heartCount": 29,
+          "createdAt": "2026-05-06T16:10:00.000Z",
+          "comments": [
+            {
+              "profile": "azul-m",
+              "body": "Her synthesis was the reason the team aligned so quickly.",
+              "createdAt": "2026-05-06T16:56:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "jose-l",
+      "name": "Jose L.",
+      "role": "Backend Developer",
+      "profilePicture": "assets/avatars/jose.png",
+      "memories": [
+        {
+          "id": "jose-from-luis-01",
+          "author": "luis-f",
+          "body": "Jose designed the data contract clearly enough that the frontend moved without waiting on a server. He writes APIs people can actually use.",
+          "image": "assets/memories/api-contract.webp",
+          "heartCount": 16,
+          "createdAt": "2026-04-22T15:10:00.000Z",
+          "comments": [
+            {
+              "profile": "antonio-m",
+              "body": "That contract saved us an entire planning meeting.",
+              "createdAt": "2026-04-22T16:02:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "luis-f",
+      "name": "Luis F.",
+      "role": "Product Designer",
+      "profilePicture": "assets/avatars/luis.png",
+      "memories": [
+        {
+          "id": "luis-from-kim-01",
+          "author": "kim-n",
+          "body": "Luis translated stakeholder noise into a crisp flow. The final mockups felt ambitious, but every state still had a reason to exist.",
+          "image": "assets/memories/design-flow.webp",
+          "heartCount": 27,
+          "createdAt": "2026-04-18T14:00:00.000Z",
+          "comments": [
+            {
+              "profile": "anaid-r",
+              "body": "The empty states were especially thoughtful.",
+              "createdAt": "2026-04-18T14:44:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "kim-n",
+      "name": "Kim N.",
+      "role": "Scrum Master",
+      "profilePicture": "assets/avatars/kim.png",
+      "memories": [
+        {
+          "id": "kim-from-nat-01",
+          "author": "nat-g",
+          "body": "Kim protected focus without making process feel heavy. She made the sprint predictable, human, and surprisingly light.",
+          "image": "assets/memories/retro.webp",
+          "heartCount": 34,
+          "createdAt": "2026-04-11T18:45:00.000Z",
+          "comments": [
+            {
+              "profile": "sam-p",
+              "body": "Her retro prompts were sharp and kind.",
+              "createdAt": "2026-04-11T19:06:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "nat-g",
+      "name": "Nat G.",
+      "role": "Data Analyst",
+      "profilePicture": "assets/avatars/nat.png",
+      "memories": [
+        {
+          "id": "nat-from-anaid-01",
+          "author": "anaid-r",
+          "body": "Nat made the dashboard trustworthy by naming exactly what the metrics could and could not prove.",
+          "image": "assets/memories/analytics.webp",
+          "heartCount": 21,
+          "createdAt": "2026-04-05T20:05:00.000Z",
+          "comments": [
+            {
+              "profile": "jose-l",
+              "body": "The assumptions tab was a quiet masterpiece.",
+              "createdAt": "2026-04-05T20:42:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "sam-p",
+      "name": "Sam P.",
+      "role": "Full Stack Developer",
+      "profilePicture": "assets/avatars/sam.png",
+      "memories": [
+        {
+          "id": "sam-from-antonio-01",
+          "author": "antonio-m",
+          "body": "Sam shipped the integration with a rare mix of speed and care. The handoff notes were so clean that support could answer questions immediately.",
+          "image": "assets/memories/integration.webp",
+          "heartCount": 25,
+          "createdAt": "2026-03-29T16:35:00.000Z",
+          "comments": [
+            {
+              "profile": "kim-n",
+              "body": "Reliable from kickoff to release.",
+              "createdAt": "2026-03-29T17:18:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "azul-m",
+      "name": "Azul M.",
+      "role": "Visual Designer",
+      "profilePicture": "assets/avatars/azul.png",
+      "memories": [
+        {
+          "id": "azul-from-edwin-01",
+          "author": "edwin-r",
+          "body": "Azul gave the interface a visual language that felt confident without getting loud. Every color choice had a job.",
+          "image": "assets/memories/team-handoff.webp",
+          "heartCount": 19,
+          "createdAt": "2026-03-23T16:35:00.000Z",
+          "comments": [
+            {
+              "profile": "daniela-s",
+              "body": "The polish made the whole product feel more trustworthy.",
+              "createdAt": "2026-03-23T17:05:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "diego-p",
+      "name": "Diego P.",
+      "role": "DevOps Engineer",
+      "profilePicture": "assets/avatars/diego.jpg",
+      "memories": [
+        {
+          "id": "diego-from-erick-01",
+          "author": "erick-g",
+          "body": "Diego made deployment feel uneventful, which is exactly the kind of excellence people forget to celebrate.",
+          "image": "assets/memories/integration.webp",
+          "heartCount": 17,
+          "createdAt": "2026-03-18T15:35:00.000Z",
+          "comments": [
+            {
+              "profile": "julio-c",
+              "body": "The pipeline notes were excellent.",
+              "createdAt": "2026-03-18T16:05:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "edwin-r",
+      "name": "Edwin R.",
+      "role": "Mobile Developer",
+      "profilePicture": "assets/avatars/edwin.png",
+      "memories": [
+        {
+          "id": "edwin-from-azul-01",
+          "author": "azul-m",
+          "body": "Edwin handled the mobile edge cases with care. The final interactions felt native, quick, and intentional.",
+          "image": "assets/memories/accessibility.webp",
+          "heartCount": 20,
+          "createdAt": "2026-03-12T15:35:00.000Z",
+          "comments": [
+            {
+              "profile": "cleyri-v",
+              "body": "The small-screen behavior finally matched user expectations.",
+              "createdAt": "2026-03-12T16:05:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "erick-g",
+      "name": "Erick G.",
+      "role": "Security Engineer",
+      "profilePicture": "assets/avatars/erick.jpg",
+      "memories": [
+        {
+          "id": "erick-from-julio-01",
+          "author": "julio-c",
+          "body": "Erick reviewed the implementation with precision and never made security feel like a blocker. He gave the team better defaults.",
+          "image": "assets/memories/analytics.webp",
+          "heartCount": 23,
+          "createdAt": "2026-03-05T15:35:00.000Z",
+          "comments": [
+            {
+              "profile": "diego-p",
+              "body": "Practical, clear, and very actionable.",
+              "createdAt": "2026-03-05T16:05:00.000Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "username": "marina-a",
+      "name": "Marina A.",
+      "role": "Content Designer",
+      "profilePicture": "assets/avatars/antonio.png",
+      "memories": []
+    },
+    {
+      "username": "paula-v",
+      "name": "Paula V.",
+      "role": "Business Analyst",
+      "profilePicture": "assets/avatars/antonio.png",
+      "memories": []
+    },
+    {
+      "username": "roberto-h",
+      "name": "Roberto H.",
+      "role": "Platform Engineer",
+      "profilePicture": "assets/avatars/antonio.png",
+      "memories": []
+    },
+    {
+      "username": "valeria-t",
+      "name": "Valeria T.",
+      "role": "Support Lead",
+      "profilePicture": "assets/avatars/antonio.png",
+      "memories": []
+    }
+  ]
+}

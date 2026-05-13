@@ -1,0 +1,23 @@
+# Logs
+*.log
+npm-debug.log*
+
+# Dependency directories
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / Config
+.vscode/
+.idea/
+*.swp
+
+# Project notes
+DESIGN.md
+TO-DO.md
+
+# Environment
+.env
+.env.local
