@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 const vertexShader = `
@@ -95,8 +95,36 @@ function AuroraPlane() {
   });
 
   useEffect(() => {
-    const interval = window.setInterval(() => invalidate(), 90);
-    return () => window.clearInterval(interval);
+    let interval = 0;
+
+    const start = () => {
+      if (!interval && document.visibilityState === 'visible') {
+        interval = window.setInterval(() => invalidate(), 180);
+      }
+    };
+
+    const stop = () => {
+      if (interval) {
+        window.clearInterval(interval);
+        interval = 0;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    start();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      stop();
+    };
   }, [invalidate]);
 
   return (
@@ -115,11 +143,32 @@ function AuroraPlane() {
 }
 
 export function ShaderAurora() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
+    const update = () => setEnabled(!reducedMotion.matches && !coarsePointer.matches);
+
+    update();
+    reducedMotion.addEventListener('change', update);
+    coarsePointer.addEventListener('change', update);
+
+    return () => {
+      reducedMotion.removeEventListener('change', update);
+      coarsePointer.removeEventListener('change', update);
+    };
+  }, []);
+
+  if (!enabled) {
+    return null;
+  }
+
   return (
     <div className="shader-aurora" aria-hidden="true">
       <Canvas
         camera={{ position: [0, 0, 1], near: 0.1, far: 10 }}
-        dpr={[1, 1]}
+        dpr={[0.75, 1]}
         frameloop="demand"
         gl={{ antialias: false, alpha: true, powerPreference: 'high-performance' }}
       >

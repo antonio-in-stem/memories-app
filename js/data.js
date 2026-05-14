@@ -1,4 +1,14 @@
 export const BODY_LIMIT = 1000;
+const DEMO_GALLERY_ASSETS = [
+  '/assets/memories/team-handoff.webp',
+  '/assets/memories/design-flow.webp',
+  '/assets/memories/api-contract.webp',
+  '/assets/memories/accessibility.webp',
+  '/assets/memories/analytics.webp',
+  '/assets/memories/integration.webp',
+  '/assets/memories/qa-notes.webp',
+  '/assets/memories/retro.webp',
+];
 
 export function normalizeDirectory(rawDirectory = {}) {
   const generation = cleanText(rawDirectory.generation) || 'Memories';
@@ -51,6 +61,7 @@ export function normalizeDirectory(rawDirectory = {}) {
       const baseMemoryId = cleanText(memory?.id) || `${recipient.username}-${memoryIndex}`;
       const comments = normalizeComments(memory?.comments, byUsername, location, memoryErrors, `${baseMemoryId}-comment`);
       const likedBy = normalizeProfileList(memory?.likedBy, byUsername, `${location}.likedBy`, memoryErrors);
+      const coAuthors = normalizeCoAuthors(memory, byUsername, `${location}.coAuthors`, memoryErrors, authorUsername);
       errors.push(...memoryErrors);
 
       if (memoryErrors.length > 0) {
@@ -60,10 +71,12 @@ export function normalizeDirectory(rawDirectory = {}) {
       feed.push({
         id: baseMemoryId,
         author,
+        coAuthors,
         recipient,
         shoutout: cleanText(memory?.shoutout) || createShoutout(body),
         body,
         image: cleanText(memory?.image),
+        galleryImages: normalizeGalleryImages(memory, memoryIndex),
         heartCount: normalizeCount(memory?.heartCount),
         likedBy: likedBy.length > 0 ? likedBy : deriveLikeProfiles(profiles, recipient.username, author.username, memoryIndex),
         comments,
@@ -123,6 +136,7 @@ export function memoryMatches(memory, query) {
       memory.author.name,
       memory.author.username,
       memory.author.role,
+      ...memory.coAuthors.flatMap((profile) => [profile.name, profile.username, profile.role]),
       memory.recipient.name,
       memory.recipient.username,
       memory.recipient.role,
@@ -134,6 +148,36 @@ export function memoryMatches(memory, query) {
     .split(' ')
     .filter(Boolean)
     .every((term) => haystack.includes(term));
+}
+
+function normalizeCoAuthors(memory, byUsername, location, memoryErrors, authorUsername) {
+  const rawAuthors = Array.isArray(memory?.authors) ? memory.authors : [];
+  const rawCoAuthors = Array.isArray(memory?.coAuthors) ? memory.coAuthors : [];
+  const candidates = [...rawAuthors, ...rawCoAuthors].filter((username) => normalizeUsername(username) !== authorUsername);
+
+  return normalizeProfileList(candidates, byUsername, location, memoryErrors).slice(0, 3);
+}
+
+function normalizeGalleryImages(memory, seed) {
+  if (Array.isArray(memory?.galleryImages)) {
+    const explicitImages = memory.galleryImages
+      .map((image) => cleanText(image))
+      .filter(Boolean);
+
+    if (explicitImages.length > 0) {
+      return [...new Set(explicitImages)].slice(0, 8);
+    }
+  }
+
+  return deriveGalleryImages(cleanText(memory?.image), seed);
+}
+
+function deriveGalleryImages(primaryImage, seed) {
+  const pool = DEMO_GALLERY_ASSETS.filter((image) => image !== primaryImage && image.replace(/^\//, '') !== primaryImage);
+  const offset = pool.length > 0 ? seed % pool.length : 0;
+  const rotated = [...pool.slice(offset), ...pool.slice(0, offset)];
+
+  return rotated.slice(0, 4);
 }
 
 export function summarizeDirectory(directory) {

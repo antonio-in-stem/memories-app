@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import dynamic from 'next/dynamic';
 import { animated, useSpring } from '@react-spring/web';
 import {
   AnimatePresence,
@@ -26,7 +27,7 @@ import {
   Users2,
   X,
 } from 'lucide-react';
-import { forwardRef, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { forwardRef, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import {
   countComments,
   filterProfiles,
@@ -45,8 +46,11 @@ import { roleStyle } from '@/lib/roles';
 import { useMemoryStore } from '@/store/memory-store';
 import { RiveSignal } from './RiveSignal';
 import { MagneticField } from './MagneticField';
-import { ShaderAurora } from './ShaderAurora';
 import { SmoothScroll } from './SmoothScroll';
+
+const ShaderAurora = dynamic(() => import('./ShaderAurora').then((module) => module.ShaderAurora), {
+  ssr: false,
+});
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 28, scale: 0.98 },
@@ -64,6 +68,7 @@ const cardVariants: Variants = {
 
 const INITIAL_FEED_SIZE = 8;
 const FEED_BATCH_SIZE = 8;
+const pointerGlowStates = new WeakMap<HTMLElement, { frame: number; x: number; y: number }>();
 
 export function Experience({ directory }: { directory: Directory }) {
   const { scrollYProgress } = useScroll();
@@ -75,7 +80,6 @@ export function Experience({ directory }: { directory: Directory }) {
   const activeRole = useMemoryStore((state) => state.activeRole);
   const theme = useMemoryStore((state) => state.theme);
   const setTheme = useMemoryStore((state) => state.setTheme);
-  const heartBumps = useMemoryStore((state) => state.heartBumps);
 
   useEffect(() => {
     const stored = window.localStorage.getItem('memories.theme');
@@ -116,10 +120,6 @@ export function Experience({ directory }: { directory: Directory }) {
   }, [activeProfile, activeRole, deferredQuery]);
 
   const summary = useMemo(() => summarizeDirectory(directory), [directory]);
-  const totalHearts = useMemo(
-    () => summary.heartCount + Object.values(heartBumps).reduce((total, bump) => total + bump, 0),
-    [heartBumps, summary.heartCount],
-  );
   const spotlight = useMemo(
     () => getSpotlightProfile(directory, activeProfile, visibleMemories),
     [activeProfile, directory, visibleMemories],
@@ -142,7 +142,7 @@ export function Experience({ directory }: { directory: Directory }) {
             generation={directory.generation}
             profileCount={summary.profileCount}
             memoryCount={summary.memoryCount}
-            heartCount={totalHearts}
+            heartCount={summary.heartCount}
             commentCount={summary.commentCount}
             memories={directory.feed}
           />
@@ -164,7 +164,7 @@ export function Experience({ directory }: { directory: Directory }) {
               <strong>{visibleMemories.length} memories</strong>
             </div>
             <motion.div className="feed-list" initial="hidden" animate="show">
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence>
                 {displayedMemories.length === 0 ? (
                   <EmptyState key="empty" />
                 ) : (
@@ -428,10 +428,8 @@ const MemoryCard = memo(function MemoryCard({
   visibleMemoryIds: string[];
 }) {
   const openMemoryStack = useMemoryStore((state) => state.openMemoryStack);
-  const bumpHeart = useMemoryStore((state) => state.bumpHeart);
-  const heartBumps = useMemoryStore((state) => state.heartBumps);
-  const hearts = memory.heartCount + (heartBumps[memory.id] || 0);
-  const bumpCount = heartBumps[memory.id] || 0;
+  const heartBump = useMemoryStore((state) => state.heartBumps[memory.id] || 0);
+  const hearts = memory.heartCount + heartBump;
   const commentTotal = countComments(memory.comments);
 
   return (
@@ -440,29 +438,11 @@ const MemoryCard = memo(function MemoryCard({
       className="memory-card radiant-border"
       custom={index}
       variants={cardVariants}
-      layout
       onPointerMove={trackPointerGlow}
     >
       <div className="memory-media">
         {memory.image ? <img src={memory.image} alt={`Memory for ${memory.recipient.name}`} loading="lazy" decoding="async" /> : null}
-        <button className="heart-button" type="button" onClick={() => bumpHeart(memory.id)}>
-          <Heart size={17} fill="currentColor" />
-          <strong>{formatNumber(hearts)}</strong>
-          <AnimatePresence>
-            {bumpCount > 0 ? (
-              <motion.span
-                className="heart-burst"
-                key={bumpCount}
-                initial={{ opacity: 0, y: 8, scale: 0.6 }}
-                animate={{ opacity: 1, y: -20, scale: 1 }}
-                exit={{ opacity: 0, y: -34, scale: 0.82 }}
-                transition={{ duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
-              >
-                +1
-              </motion.span>
-            ) : null}
-          </AnimatePresence>
-        </button>
+        <MemoryHeartButton memoryId={memory.id} count={hearts} label={`Favorite memory for ${memory.recipient.name}`} />
       </div>
       <div className="memory-content">
         <MemoryRoute memory={memory} />
@@ -482,6 +462,7 @@ const MemoryCard = memo(function MemoryCard({
         {memory.comments.length > 0 && (
           <RotatingCommentPreview
             memory={memory}
+            seed={index}
             onOpen={() => openMemoryStack(visibleMemoryIds, memory.id, 'comments')}
           />
         )}
@@ -489,6 +470,81 @@ const MemoryCard = memo(function MemoryCard({
     </motion.article>
   );
 });
+
+function MemoryHeartButton({ memoryId, count, label, className = '' }: { memoryId: string; count: number; label: string; className?: string }) {
+  const bumpHeart = useMemoryStore((state) => state.bumpHeart);
+  const bumpCount = useMemoryStore((state) => state.heartBumps[memoryId] || 0);
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 8 }, (_, index) => ({
+        id: index,
+        angle: index * 45 - 10,
+        distance: 34 + (index % 3) * 8,
+      })),
+    [],
+  );
+
+  return (
+    <motion.button
+      className={`heart-button ${className}`.trim()}
+      type="button"
+      onClick={() => bumpHeart(memoryId)}
+      aria-label={label}
+      whileHover={{ scale: 1.065, y: -3 }}
+      whileTap={{ scale: 0.9 }}
+      transition={{ type: 'spring', stiffness: 430, damping: 18, mass: 0.7 }}
+    >
+      <span className="heart-aura" />
+      <motion.span
+        className="heart-core"
+        animate={bumpCount > 0 ? { scale: [1, 1.36, 0.96, 1], rotate: [0, -8, 6, 0] } : { scale: 1, rotate: 0 }}
+        transition={{ duration: 0.56, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <Heart size={18} fill="currentColor" />
+      </motion.span>
+      <motion.strong
+        key={count}
+        initial={{ y: 8, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {formatNumber(count)}
+      </motion.strong>
+      <AnimatePresence>
+        {bumpCount > 0 ? (
+          <motion.span
+            className="heart-burst"
+            key={bumpCount}
+            initial={{ opacity: 0, y: 8, scale: 0.56 }}
+            animate={{ opacity: 1, y: -24, scale: 1 }}
+            exit={{ opacity: 0, y: -42, scale: 0.78 }}
+            transition={{ duration: 0.62, ease: [0.16, 1, 0.3, 1] }}
+          >
+            +1
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {bumpCount > 0 ? (
+          <span className="heart-particles" key={`particles-${bumpCount}`} aria-hidden="true">
+            {particles.map((particle) => (
+              <span
+                className="heart-particle"
+                key={particle.id}
+                style={
+                  {
+                    '--burst-angle': `${particle.angle}deg`,
+                    '--burst-distance': `${particle.distance}px`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </span>
+        ) : null}
+      </AnimatePresence>
+    </motion.button>
+  );
+}
 
 function FeedLoader({ remainingCount, onLoadMore }: { remainingCount: number; onLoadMore: () => void }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -557,14 +613,16 @@ function FeedSkeletons() {
 }
 
 function MemoryRoute({ memory }: { memory: Memory }) {
+  const authorNames = [memory.author, ...memory.coAuthors].map((profile) => profile.name).join(', ');
+
   return (
     <div className="memory-route">
-      <Avatar profile={memory.author} size="md" />
+      <AuthorGalaxy memory={memory} />
       <span className="route-line" />
       <Avatar profile={memory.recipient} size="md" />
       <div className="route-text">
         <strong>
-          {memory.author.name} to {memory.recipient.name}
+          {authorNames} to {memory.recipient.name}
         </strong>
         <div className="route-roles">
           <span className="role-chip" style={roleStyle(memory.author.role)}>
@@ -576,6 +634,21 @@ function MemoryRoute({ memory }: { memory: Memory }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function AuthorGalaxy({ memory }: { memory: Memory }) {
+  const orbiters = memory.coAuthors.slice(0, 3);
+
+  return (
+    <span className="author-galaxy" data-has-orbiters={orbiters.length > 0}>
+      <Avatar profile={memory.author} size="md" />
+      {orbiters.map((profile, index) => (
+        <span className="author-orbiter" data-orbit={index} key={profile.username}>
+          <Avatar profile={profile} size="sm" />
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -603,37 +676,62 @@ function LikeStrip({ profiles, overflowCount = 0 }: { profiles: Profile[]; overf
   );
 }
 
-function RotatingCommentPreview({ memory, onOpen }: { memory: Memory; onOpen: () => void }) {
+function RotatingCommentPreview({ memory, seed, onOpen }: { memory: Memory; seed: number; onOpen: () => void }) {
   const comments = useMemo(() => flattenComments(memory.comments), [memory.comments]);
   const [index, setIndex] = useState(0);
+  const [visible, setVisible] = useState(false);
+  const previewRef = useRef<HTMLButtonElement | null>(null);
   const active = comments[index % Math.max(comments.length, 1)];
 
   useEffect(() => {
-    if (comments.length <= 1) {
+    const node = previewRef.current;
+    if (!node) {
       return;
     }
 
-    const interval = window.setInterval(() => {
-      setIndex((current) => (current + 1) % comments.length);
-    }, 4200);
+    const observer = new IntersectionObserver(([entry]) => setVisible(Boolean(entry?.isIntersecting)), {
+      rootMargin: '160px 0px',
+      threshold: 0.01,
+    });
+    observer.observe(node);
 
-    return () => window.clearInterval(interval);
-  }, [comments.length]);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (comments.length <= 1 || !visible) {
+      return;
+    }
+
+    let interval = 0;
+    const delay = window.setTimeout(() => {
+      interval = window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          setIndex((current) => (current + 1) % comments.length);
+        }
+      }, 5200);
+    }, (seed % 4) * 700);
+
+    return () => {
+      window.clearTimeout(delay);
+      window.clearInterval(interval);
+    };
+  }, [comments.length, seed, visible]);
 
   if (!active) {
     return null;
   }
 
   return (
-    <button className="comment-preview" type="button" onClick={onOpen}>
+    <button className="comment-preview" type="button" onClick={onOpen} ref={previewRef}>
       <span className="comment-preview-glow" />
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
           className="comment-preview-inner"
           key={active.id}
-          initial={{ opacity: 0, y: 12, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          exit={{ opacity: 0, y: -12, filter: 'blur(8px)' }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
         >
           <Avatar profile={active.profile} size="sm" />
@@ -649,9 +747,9 @@ function RotatingCommentPreview({ memory, onOpen }: { memory: Memory; onOpen: ()
 }
 
 function CompactComment({ comment }: { comment: Comment }) {
-  const commentFavs = useMemoryStore((state) => state.commentFavs);
+  const bumpCount = useMemoryStore((state) => state.commentFavs[comment.id] || 0);
   const bumpCommentFav = useMemoryStore((state) => state.bumpCommentFav);
-  const favs = comment.favCount + (commentFavs[comment.id] || 0);
+  const favs = comment.favCount + bumpCount;
 
   return (
     <div className="comment-item">
@@ -675,8 +773,7 @@ function CompactComment({ comment }: { comment: Comment }) {
 }
 
 function SpotlightPanel({ profile, memories }: { profile: Profile; memories: Memory[] }) {
-  const heartBumps = useMemoryStore((state) => state.heartBumps);
-  const totalHearts = memories.reduce((total, memory) => total + memory.heartCount + (heartBumps[memory.id] || 0), 0);
+  const totalHearts = memories.reduce((total, memory) => total + memory.heartCount, 0);
   const latest = memories[0];
 
   return (
@@ -744,7 +841,7 @@ function MemoryTimeline({ memories }: { memories: Memory[] }) {
       <span className="eyebrow">Signal timeline</span>
       <h2>Recent pulses</h2>
       <div className="timeline-list">
-        {memories.slice(0, 5).map((memory, index) => (
+        {memories.slice(0, 4).map((memory, index) => (
           <motion.button
             className="timeline-row"
             type="button"
@@ -812,9 +909,8 @@ const CommentThreadPanel = forwardRef<HTMLElement, { memory: Memory }>(function 
 });
 
 function CommentThread({ comment, depth }: { comment: Comment; depth: number }) {
-  const commentFavs = useMemoryStore((state) => state.commentFavs);
+  const bumpCount = useMemoryStore((state) => state.commentFavs[comment.id] || 0);
   const bumpCommentFav = useMemoryStore((state) => state.bumpCommentFav);
-  const bumpCount = commentFavs[comment.id] || 0;
   const favs = comment.favCount + bumpCount;
 
   return (
@@ -898,8 +994,6 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
   const stackIndex = useMemoryStore((state) => state.stackIndex);
   const closeMemoryStack = useMemoryStore((state) => state.closeMemoryStack);
   const rotateStack = useMemoryStore((state) => state.rotateStack);
-  const bumpHeart = useMemoryStore((state) => state.bumpHeart);
-  const heartBumps = useMemoryStore((state) => state.heartBumps);
   const storyRef = useRef<HTMLDivElement | null>(null);
   const commentsRef = useRef<HTMLElement | null>(null);
   const stack = useMemo(
@@ -907,6 +1001,7 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
     [memories, stackIds],
   );
   const active = stack[stackIndex];
+  const activeHeartBump = useMemoryStore((state) => (active ? state.heartBumps[active.id] || 0 : 0));
 
   useEffect(() => {
     if (!modalOpen || !active) {
@@ -961,9 +1056,9 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="memoryDialogTitle"
-          initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-          animate={{ opacity: 1, backdropFilter: 'blur(8px)' }}
-          exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           onWheel={(event) => {
             if (event.target === event.currentTarget) {
@@ -1003,9 +1098,9 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
             <motion.article
               className="modal-memory-card"
               key={active.id}
-              initial={{ opacity: 0, x: 82, y: 18, rotate: 3.2, scale: 0.94, filter: 'blur(12px)' }}
-              animate={{ opacity: 1, x: 0, y: 0, rotate: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: -82, y: 26, rotate: -3.4, scale: 0.93, filter: 'blur(14px)' }}
+              initial={{ opacity: 0, x: 82, y: 18, rotate: 3.2, scale: 0.94 }}
+              animate={{ opacity: 1, x: 0, y: 0, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -82, y: 26, rotate: -3.4, scale: 0.93 }}
               transition={{ type: 'spring', stiffness: 190, damping: 24, mass: 0.86 }}
             >
               <div className="modal-media">
@@ -1013,26 +1108,15 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
               </div>
               <div className="modal-story" ref={storyRef} onWheel={(event) => event.stopPropagation()}>
                 <MemoryRoute memory={active} />
-                <button className="heart-button modal-heart" type="button" onClick={() => bumpHeart(active.id)}>
-                  <Heart size={17} fill="currentColor" />
-                  <strong>{formatNumber(active.heartCount + (heartBumps[active.id] || 0))}</strong>
-                  <AnimatePresence>
-                    {heartBumps[active.id] ? (
-                      <motion.span
-                        className="heart-burst"
-                        key={heartBumps[active.id]}
-                        initial={{ opacity: 0, y: 8, scale: 0.6 }}
-                        animate={{ opacity: 1, y: -20, scale: 1 }}
-                        exit={{ opacity: 0, y: -34, scale: 0.82 }}
-                        transition={{ duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
-                      >
-                        +1
-                      </motion.span>
-                    ) : null}
-                  </AnimatePresence>
-                </button>
+                <MemoryHeartButton
+                  memoryId={active.id}
+                  count={active.heartCount + activeHeartBump}
+                  label={`Favorite memory for ${active.recipient.name}`}
+                  className="modal-heart"
+                />
                 <h2 id="memoryDialogTitle">{active.shoutout}</h2>
                 <p>{active.body}</p>
+                <MemoryGalleryCarousel memory={active} />
                 <div className="memory-meta">
                   <span>
                     {stackIndex + 1} of {stack.length}
@@ -1047,6 +1131,65 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
         </motion.div>
       ) : null}
     </AnimatePresence>
+  );
+}
+
+function MemoryGalleryCarousel({ memory }: { memory: Memory }) {
+  const [index, setIndex] = useState(0);
+  const images = memory.galleryImages;
+  const activeImage = images[index];
+
+  useEffect(() => {
+    setIndex(0);
+  }, [memory.id]);
+
+  if (images.length === 0 || !activeImage) {
+    return null;
+  }
+
+  const rotateGallery = (direction: -1 | 1) => {
+    setIndex((current) => (current + direction + images.length) % images.length);
+  };
+
+  return (
+    <section className="memory-gallery" aria-label="Memory gallery">
+      <div className="memory-gallery-frame">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.img
+            key={activeImage}
+            src={activeImage}
+            alt=""
+            initial={{ opacity: 0, x: 34, scale: 1.03 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -34, scale: 0.98 }}
+            transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+          />
+        </AnimatePresence>
+        {images.length > 1 ? (
+          <>
+            <button className="gallery-nav gallery-nav-left" type="button" onClick={() => rotateGallery(-1)} aria-label="Previous gallery image">
+              <ChevronLeft size={20} />
+            </button>
+            <button className="gallery-nav gallery-nav-right" type="button" onClick={() => rotateGallery(1)} aria-label="Next gallery image">
+              <ChevronRight size={20} />
+            </button>
+          </>
+        ) : null}
+      </div>
+      {images.length > 1 ? (
+        <div className="gallery-dots">
+          {images.map((image, dotIndex) => (
+            <button
+              className={dotIndex === index ? 'is-active' : undefined}
+              type="button"
+              key={image}
+              onClick={() => setIndex(dotIndex)}
+              aria-label={`Go to gallery image ${dotIndex + 1}`}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1097,7 +1240,19 @@ function scrollRail(direction: -1 | 1) {
 }
 
 function trackPointerGlow(event: PointerEvent<HTMLElement>) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  event.currentTarget.style.setProperty('--mx', `${event.clientX - rect.left}px`);
-  event.currentTarget.style.setProperty('--my', `${event.clientY - rect.top}px`);
+  const element = event.currentTarget;
+  const state = pointerGlowStates.get(element) || { frame: 0, x: 0, y: 0 };
+  state.x = event.clientX;
+  state.y = event.clientY;
+
+  if (!state.frame) {
+    state.frame = window.requestAnimationFrame(() => {
+      const rect = element.getBoundingClientRect();
+      element.style.setProperty('--mx', `${state.x - rect.left}px`);
+      element.style.setProperty('--my', `${state.y - rect.top}px`);
+      state.frame = 0;
+    });
+  }
+
+  pointerGlowStates.set(element, state);
 }

@@ -10,6 +10,10 @@ export function MagneticField() {
   const springY = useSpring(y, { stiffness: 180, damping: 28, mass: 0.45 });
 
   useEffect(() => {
+    if (!window.matchMedia('(pointer: fine)').matches) {
+      return;
+    }
+
     let frame = 0;
     let nextX = -120;
     let nextY = -120;
@@ -25,8 +29,6 @@ export function MagneticField() {
       frame = window.requestAnimationFrame(() => {
         x.set(nextX - 160);
         y.set(nextY - 160);
-        document.documentElement.style.setProperty('--page-mx', `${nextX}px`);
-        document.documentElement.style.setProperty('--page-my', `${nextY}px`);
         frame = 0;
       });
     };

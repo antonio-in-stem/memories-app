@@ -1,7 +1,12 @@
 'use client';
 
-import Rive from '@rive-app/react-canvas';
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
+
+const Rive = dynamic(() => import('@rive-app/react-canvas'), {
+  ssr: false,
+  loading: () => null,
+});
 
 export function RiveSignal() {
   const [active, setActive] = useState(false);
