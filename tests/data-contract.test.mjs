@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  countComments,
   filterProfiles,
+  flattenComments,
   normalizeDirectory,
   summarizeDirectory,
 } from '../js/data.js';
@@ -34,6 +36,16 @@ const sampleDirectory = {
               profile: 'antonio-m',
               body: 'A great teammate under pressure.',
               createdAt: '2026-05-10T12:00:00.000Z',
+              favCount: 3,
+              likedBy: ['anaid'],
+              replies: [
+                {
+                  profile: 'anaid',
+                  body: 'That pressure made the support even more valuable.',
+                  createdAt: '2026-05-10T12:30:00.000Z',
+                  favCount: 2,
+                },
+              ],
             },
           ],
         },
@@ -52,6 +64,9 @@ test('normalizeDirectory derives a feed with author and recipient profiles', () 
   assert.equal(directory.feed[0].author.username, 'antonio-m');
   assert.equal(directory.feed[0].comments[0].profile.username, 'antonio-m');
   assert.equal(directory.feed[0].comments[0].createdAt, '2026-05-10T12:00:00.000Z');
+  assert.equal(directory.feed[0].comments[0].favCount, 3);
+  assert.equal(directory.feed[0].comments[0].likedBy[0].username, 'anaid');
+  assert.equal(directory.feed[0].comments[0].replies[0].profile.username, 'anaid');
   assert.equal(directory.feed[0].shoutout, 'Anaid kept the release grounded with calm, useful testing notes.');
 });
 
@@ -88,6 +103,17 @@ test('summarizeDirectory returns premium overview metrics for the static experie
   assert.equal(summary.profileCount, 2);
   assert.equal(summary.memoryCount, 1);
   assert.equal(summary.heartCount, 30);
-  assert.equal(summary.commentCount, 1);
+  assert.equal(summary.commentCount, 2);
   assert.equal(summary.topProfiles[0].username, 'anaid');
+});
+
+test('comment helpers flatten nested threads for counters and previews', () => {
+  const directory = normalizeDirectory(sampleDirectory);
+  const comments = directory.feed[0].comments;
+
+  assert.equal(countComments(comments), 2);
+  assert.deepEqual(
+    flattenComments(comments).map((comment) => comment.profile.username),
+    ['antonio-m', 'anaid'],
+  );
 });

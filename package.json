@@ -4,7 +4,37 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build --turbopack",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
-    "serve": "python -m http.server 8080"
+    "serve:legacy": "python -m http.server 8080"
+  },
+  "dependencies": {
+    "@react-spring/web": "^10.0.3",
+    "@react-three/fiber": "^9.6.1",
+    "@rive-app/react-canvas": "^4.28.4",
+    "framer-motion": "^12.38.0",
+    "gsap": "^3.15.0",
+    "lenis": "^1.3.23",
+    "lucide-react": "^1.14.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "three": "^0.184.0",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/node": "^25.7.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.184.1",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }

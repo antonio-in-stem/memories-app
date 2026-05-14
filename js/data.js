@@ -48,7 +48,9 @@ export function normalizeDirectory(rawDirectory = {}) {
         memoryErrors.push(`${location}: Unknown author profile "${authorUsername || '(empty)'}".`);
       }
 
-      const comments = normalizeComments(memory?.comments, byUsername, location, memoryErrors);
+      const baseMemoryId = cleanText(memory?.id) || `${recipient.username}-${memoryIndex}`;
+      const comments = normalizeComments(memory?.comments, byUsername, location, memoryErrors, `${baseMemoryId}-comment`);
+      const likedBy = normalizeProfileList(memory?.likedBy, byUsername, `${location}.likedBy`, memoryErrors);
       errors.push(...memoryErrors);
 
       if (memoryErrors.length > 0) {
@@ -56,13 +58,14 @@ export function normalizeDirectory(rawDirectory = {}) {
       }
 
       feed.push({
-        id: cleanText(memory?.id) || `${recipient.username}-${memoryIndex}`,
+        id: baseMemoryId,
         author,
         recipient,
         shoutout: cleanText(memory?.shoutout) || createShoutout(body),
         body,
         image: cleanText(memory?.image),
         heartCount: normalizeCount(memory?.heartCount),
+        likedBy: likedBy.length > 0 ? likedBy : deriveLikeProfiles(profiles, recipient.username, author.username, memoryIndex),
         comments,
         createdAt: cleanText(memory?.createdAt),
         order: feed.length,
@@ -93,7 +96,7 @@ export function filterProfiles(directory, query) {
     const memoryText = profile.memories
       .flatMap((memory) => [
         memory?.body,
-        ...(Array.isArray(memory?.comments) ? memory.comments.map((comment) => comment?.body) : []),
+        ...(Array.isArray(memory?.comments) ? flattenRawComments(memory.comments).map((comment) => comment?.body) : []),
       ])
       .join(' ');
     const haystack = normalizeSearch(
@@ -123,7 +126,7 @@ export function memoryMatches(memory, query) {
       memory.recipient.name,
       memory.recipient.username,
       memory.recipient.role,
-      ...memory.comments.flatMap((comment) => [comment.body, comment.profile.name, comment.profile.username]),
+      ...flattenComments(memory.comments).flatMap((comment) => [comment.body, comment.profile.name, comment.profile.username]),
     ].join(' '),
   );
 
@@ -135,7 +138,7 @@ export function memoryMatches(memory, query) {
 
 export function summarizeDirectory(directory) {
   const heartCount = directory.feed.reduce((total, memory) => total + memory.heartCount, 0);
-  const commentCount = directory.feed.reduce((total, memory) => total + memory.comments.length, 0);
+  const commentCount = directory.feed.reduce((total, memory) => total + countComments(memory.comments), 0);
   const topProfiles = [...directory.profiles]
     .sort((left, right) => {
       const memoryDelta = right.memoryCount - left.memoryCount;
@@ -160,7 +163,7 @@ export function getInitials(name) {
     .join('');
 }
 
-function normalizeComments(rawComments, byUsername, location, memoryErrors) {
+function normalizeComments(rawComments, byUsername, location, memoryErrors, parentId = 'comment') {
   if (!Array.isArray(rawComments)) {
     return [];
   }
@@ -168,9 +171,23 @@ function normalizeComments(rawComments, byUsername, location, memoryErrors) {
   const comments = [];
 
   rawComments.forEach((comment, commentIndex) => {
+    const commentId = cleanText(comment?.id) || `${parentId}-${commentIndex + 1}`;
     const profileUsername = normalizeUsername(comment?.profile);
     const profile = byUsername.get(profileUsername);
     const body = cleanText(comment?.body);
+    const likedBy = normalizeProfileList(
+      comment?.likedBy,
+      byUsername,
+      `${location}.comments[${commentIndex}].likedBy`,
+      memoryErrors,
+    );
+    const replies = normalizeComments(
+      comment?.replies,
+      byUsername,
+      `${location}.comments[${commentIndex}]`,
+      memoryErrors,
+      commentId,
+    );
 
     if (!profile) {
       memoryErrors.push(
@@ -183,11 +200,81 @@ function normalizeComments(rawComments, byUsername, location, memoryErrors) {
     }
 
     if (profile && body) {
-      comments.push({ profile, body, createdAt: cleanText(comment?.createdAt) });
+      comments.push({
+        id: commentId,
+        profile,
+        body,
+        createdAt: cleanText(comment?.createdAt),
+        favCount: Math.max(normalizeCount(comment?.favCount), likedBy.length),
+        likedBy,
+        replies,
+      });
     }
   });
 
   return comments;
+}
+
+export function flattenComments(comments) {
+  return comments.flatMap((comment) => [comment, ...flattenComments(comment.replies)]);
+}
+
+export function countComments(comments) {
+  return flattenComments(comments).length;
+}
+
+export function sortComments(comments, mode) {
+  return [...comments].sort((left, right) => {
+    if (mode === 'recent') {
+      return toTimestamp(right.createdAt) - toTimestamp(left.createdAt);
+    }
+
+    const relevanceDelta = commentScore(right) - commentScore(left);
+    return relevanceDelta || toTimestamp(right.createdAt) - toTimestamp(left.createdAt);
+  });
+}
+
+function commentScore(comment) {
+  return comment.favCount + comment.likedBy.length + comment.replies.length * 3;
+}
+
+function flattenRawComments(comments) {
+  return comments.flatMap((comment) => [
+    comment,
+    ...(Array.isArray(comment?.replies) ? flattenRawComments(comment.replies) : []),
+  ]);
+}
+
+function normalizeProfileList(usernames, byUsername, location, memoryErrors) {
+  if (!Array.isArray(usernames)) {
+    return [];
+  }
+
+  const profiles = [];
+  const seen = new Set();
+
+  usernames.forEach((username, index) => {
+    const normalized = normalizeUsername(username);
+    const profile = byUsername.get(normalized);
+
+    if (!profile) {
+      memoryErrors.push(`${location}[${index}]: Unknown profile "${normalized || '(empty)'}".`);
+      return;
+    }
+
+    if (!seen.has(profile.username)) {
+      seen.add(profile.username);
+      profiles.push(profile);
+    }
+  });
+
+  return profiles;
+}
+
+function deriveLikeProfiles(profiles, recipientUsername, authorUsername, seed) {
+  return profiles
+    .filter((profile) => profile.username !== recipientUsername && profile.username !== authorUsername)
+    .slice(seed % 3, seed % 3 + 8);
 }
 
 function createShoutout(body) {
