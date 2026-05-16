@@ -1,8 +1,15 @@
-import { Experience } from '@/components/Experience';
-import { getDirectory } from '@/lib/data';
+import { auth } from '@/auth';
+import { CircleHome, PublicHome } from '@/components/HomeExperience';
+import { getCircleHub } from '@/server/circles';
 
-export default function Page() {
-  const directory = getDirectory();
+export default async function Page() {
+  const session = await auth();
 
-  return <Experience directory={directory} />;
+  if (!session?.user) {
+    return <PublicHome />;
+  }
+
+  const circles = await getCircleHub(session.user);
+
+  return <CircleHome viewer={session.user} circles={circles} />;
 }

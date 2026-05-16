@@ -24,3 +24,5 @@ TO-DO.md
 # Environment
 .env
 .env.local
+.venv
+.venv.local

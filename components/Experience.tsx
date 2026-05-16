@@ -1,6 +1,8 @@
 ﻿'use client';
 
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { signOut } from 'next-auth/react';
 import { animated, useSpring } from '@react-spring/web';
 import {
   AnimatePresence,
@@ -15,12 +17,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Heart,
+  Image as ImageIcon,
   Layers3,
   MessageCircle,
   MoreHorizontal,
   Moon,
+  LogOut,
+  Settings,
   SlidersHorizontal,
   Search,
+  Send,
   Sparkles,
   Sun,
   ThumbsUp,
@@ -42,6 +48,7 @@ import {
   type Memory,
   type Profile,
 } from '@/lib/data';
+import { formatPlatformName } from '@/lib/display-name';
 import { roleStyle } from '@/lib/roles';
 import { useMemoryStore } from '@/store/memory-store';
 import { RiveSignal } from './RiveSignal';
@@ -70,7 +77,8 @@ const INITIAL_FEED_SIZE = 8;
 const FEED_BATCH_SIZE = 8;
 const pointerGlowStates = new WeakMap<HTMLElement, { frame: number; x: number; y: number }>();
 
-export function Experience({ directory }: { directory: Directory }) {
+export function Experience({ directory, viewer }: { directory: Directory; viewer?: { name?: string | null; image?: string | null } }) {
+  const [liveDirectory, setLiveDirectory] = useState(directory);
   const { scrollYProgress } = useScroll();
   const heroLift = useTransform(scrollYProgress, [0, 0.28], [0, -36]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.32], [1, 0.72]);
@@ -93,11 +101,15 @@ export function Experience({ directory }: { directory: Directory }) {
     window.localStorage.setItem('memories.theme', theme);
   }, [theme]);
 
-  const visibleProfiles = useMemo(() => filterProfiles(directory, deferredQuery), [directory, deferredQuery]);
-  const roles = useMemo(() => getRoleOptions(directory.profiles), [directory.profiles]);
+  useEffect(() => {
+    setLiveDirectory(directory);
+  }, [directory]);
+
+  const visibleProfiles = useMemo(() => filterProfiles(liveDirectory, deferredQuery), [liveDirectory, deferredQuery]);
+  const roles = useMemo(() => getRoleOptions(liveDirectory.profiles), [liveDirectory.profiles]);
   const visibleMemories = useMemo(
     () =>
-      directory.feed.filter((memory) => {
+      liveDirectory.feed.filter((memory) => {
         const profileMatches = activeProfile === 'all' || memory.recipient.username === activeProfile;
         const roleMatches =
           activeRole === 'all' ||
@@ -105,7 +117,7 @@ export function Experience({ directory }: { directory: Directory }) {
           memory.recipient.role === activeRole;
         return profileMatches && roleMatches && memoryMatches(memory, deferredQuery);
       }),
-    [activeProfile, activeRole, deferredQuery, directory],
+    [activeProfile, activeRole, deferredQuery, liveDirectory],
   );
   const [feedLimit, setFeedLimit] = useState(INITIAL_FEED_SIZE);
   const displayedMemories = useMemo(() => visibleMemories.slice(0, feedLimit), [feedLimit, visibleMemories]);
@@ -119,14 +131,14 @@ export function Experience({ directory }: { directory: Directory }) {
     setFeedLimit(INITIAL_FEED_SIZE);
   }, [activeProfile, activeRole, deferredQuery]);
 
-  const summary = useMemo(() => summarizeDirectory(directory), [directory]);
+  const summary = useMemo(() => summarizeDirectory(liveDirectory), [liveDirectory]);
   const spotlight = useMemo(
-    () => getSpotlightProfile(directory, activeProfile, visibleMemories),
-    [activeProfile, directory, visibleMemories],
+    () => getSpotlightProfile(liveDirectory, activeProfile, visibleMemories),
+    [activeProfile, liveDirectory, visibleMemories],
   );
   const spotlightMemories = useMemo(
-    () => directory.feed.filter((memory) => memory.recipient.username === spotlight.username),
-    [directory.feed, spotlight.username],
+    () => liveDirectory.feed.filter((memory) => memory.recipient.username === spotlight.username),
+    [liveDirectory.feed, spotlight.username],
   );
 
   return (
@@ -135,27 +147,32 @@ export function Experience({ directory }: { directory: Directory }) {
       <ShaderAurora />
       <MagneticField />
       <motion.div className="scroll-progress" style={{ scaleX: scrollYProgress }} />
-      <TopBar />
+      <TopBar viewer={viewer} />
       <main className="app-shell">
         <motion.section className="hero-shell" style={{ y: heroLift, opacity: heroOpacity }}>
           <Hero
-            generation={directory.generation}
+            generation={liveDirectory.generation}
             profileCount={summary.profileCount}
             memoryCount={summary.memoryCount}
             heartCount={summary.heartCount}
             commentCount={summary.commentCount}
-            memories={directory.feed}
+            memories={liveDirectory.feed}
           />
         </motion.section>
 
-        {directory.errors.length > 0 && (
+        {liveDirectory.errors.length > 0 && (
           <div className="data-alert" role="status">
-            {directory.errors.length} data issue(s) found. {directory.errors.slice(0, 2).join(' ')}
+            {liveDirectory.errors.length} data issue(s) found. {liveDirectory.errors.slice(0, 2).join(' ')}
           </div>
         )}
 
         <ProfileRail profiles={visibleProfiles} />
         <RoleFilter roles={roles} />
+        <MemoryComposer
+          profiles={liveDirectory.profiles}
+          viewer={viewer}
+          onCreated={setLiveDirectory}
+        />
 
         <section className="content-grid" aria-label="Memories experience">
           <section className="feed-area" aria-label="Featured recognition">
@@ -194,23 +211,25 @@ export function Experience({ directory }: { directory: Directory }) {
           </aside>
         </section>
       </main>
-      <MemoryStackDialog memories={directory.feed} />
+      <MemoryStackDialog memories={liveDirectory.feed} onDirectoryChange={setLiveDirectory} />
     </>
   );
 }
 
-function TopBar() {
+function TopBar({ viewer }: { viewer?: { name?: string | null; image?: string | null } }) {
   const query = useMemoryStore((state) => state.query);
   const setQuery = useMemoryStore((state) => state.setQuery);
   const theme = useMemoryStore((state) => state.theme);
   const toggleTheme = useMemoryStore((state) => state.toggleTheme);
+  const viewerName = viewer ? formatPlatformName(viewer.name) : '';
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="topbar progressive-blur">
-      <a className="brand" href="#" aria-label="Memories home">
+      <Link className="brand" href="/" aria-label="Go to my circles">
         <span className="brand-orbit" />
         <span>Memories</span>
-      </a>
+      </Link>
       <label className="search-field">
         <Search size={18} />
         <span className="sr-only">Search memories</span>
@@ -224,6 +243,49 @@ function TopBar() {
       <button className="icon-button" type="button" onClick={toggleTheme} aria-label="Toggle color theme">
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
+      {viewer ? (
+        <div className="account-menu">
+          <button
+            className="viewer-pill"
+            type="button"
+            onClick={() => setMenuOpen((current) => !current)}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+          >
+            {viewer.image ? <img src={viewer.image} alt="" /> : <Sparkles size={16} />}
+            <span>{viewerName}</span>
+          </button>
+          <AnimatePresence>
+            {menuOpen ? (
+              <motion.div
+                className="account-popover radiant-border"
+                role="menu"
+                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Link href="/" role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <Users2 size={16} />
+                  My circles
+                </Link>
+                <Link href="/circles/cohorte-65" role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <Sparkles size={16} />
+                  Generation CH65
+                </Link>
+                <button type="button" role="menuitem" onClick={toggleTheme}>
+                  <Settings size={16} />
+                  {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                </button>
+                <button type="button" role="menuitem" onClick={() => void signOut({ callbackUrl: '/' })}>
+                  <LogOut size={16} />
+                  Sign out
+                </button>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -389,6 +451,219 @@ function RoleFilter({ roles }: { roles: string[] }) {
   );
 }
 
+function MemoryComposer({
+  profiles,
+  viewer,
+  onCreated,
+}: {
+  profiles: Profile[];
+  viewer?: { name?: string | null; image?: string | null };
+  onCreated: (directory: Directory) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [recipientUsername, setRecipientUsername] = useState(profiles[0]?.username || '');
+  const [shoutout, setShoutout] = useState('');
+  const [body, setBody] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const recipient = profiles.find((profile) => profile.username === recipientUsername) || profiles[0];
+  const viewerName = formatPlatformName(viewer?.name);
+
+  useEffect(() => {
+    if (!recipientUsername && profiles[0]) {
+      setRecipientUsername(profiles[0].username);
+    }
+  }, [profiles, recipientUsername]);
+
+  useEffect(() => {
+    if (!imageFile) {
+      setImagePreview('');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(imageFile);
+    setImagePreview(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [imageFile]);
+
+  const submit = async () => {
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const uploadedImage = imageFile ? await uploadImage(imageFile) : null;
+      const nextDirectory = await postJson<Directory>('/api/memories', {
+        recipientUsername,
+        shoutout,
+        body,
+        image: uploadedImage?.url || '',
+      });
+      onCreated(nextDirectory);
+      setOpen(false);
+      setShoutout('');
+      setBody('');
+      setImageFile(null);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not create memory.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <motion.button
+        className="feed-composer radiant-border"
+        type="button"
+        onClick={() => setOpen(true)}
+        onPointerMove={trackPointerGlow}
+        whileHover={{ y: -3, scale: 1.01 }}
+        whileTap={{ scale: 0.985 }}
+      >
+        <span className="composer-avatar">
+          {viewer?.image ? <img src={viewer.image} alt="" /> : <Sparkles size={20} />}
+        </span>
+        <span className="composer-placeholder">
+          What deserves to be remembered today{viewerName !== 'LinkedIn Member' ? `, ${viewerName.split(' ')[0]}` : ''}?
+        </span>
+        <span className="composer-tools">
+          <ImageIcon size={18} />
+          <Heart size={18} />
+          <Send size={18} />
+        </span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            className="composer-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="createMemoryTitle"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setOpen(false);
+              }
+            }}
+          >
+            <motion.section
+              className="create-memory-modal radiant-border"
+              initial={{ opacity: 0, y: 36, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+              onPointerMove={trackPointerGlow}
+            >
+              <button className="modal-close composer-close" type="button" onClick={() => setOpen(false)} aria-label="Close composer">
+                <X size={20} />
+              </button>
+              <div className="create-memory-head">
+                <span className="eyebrow">Create memory</span>
+                <h2 id="createMemoryTitle">Turn a sharp moment into a signal.</h2>
+                <p>Public recognition, written with just enough context to make the story useful.</p>
+              </div>
+              <div className="recipient-picker">
+                <label htmlFor="memoryRecipient">For</label>
+                <select id="memoryRecipient" value={recipientUsername} onChange={(event) => setRecipientUsername(event.target.value)}>
+                  {profiles.map((profile) => (
+                    <option key={profile.username} value={profile.username}>
+                      {profile.name} · {profile.role}
+                    </option>
+                  ))}
+                </select>
+                {recipient ? <Avatar profile={recipient} size="md" /> : null}
+              </div>
+              <label className="composer-field">
+                <span>Shout out</span>
+                <input
+                  value={shoutout}
+                  onChange={(event) => setShoutout(event.target.value)}
+                  maxLength={180}
+                  placeholder="A concise headline for the feed"
+                />
+              </label>
+              <label className="composer-field">
+                <span>Full story</span>
+                <textarea
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  maxLength={1000}
+                  rows={7}
+                  placeholder="What happened, why it mattered, and what the team should remember."
+                />
+              </label>
+              <label className="composer-field image-field" htmlFor="memoryImage">
+                <span>Image</span>
+                <input
+                  ref={imageInputRef}
+                  id="memoryImage"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                />
+                <span className="media-upload-card">
+                  {imagePreview ? (
+                    <>
+                      <img src={imagePreview} alt="" />
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setImageFile(null);
+                          if (imageInputRef.current) {
+                            imageInputRef.current.value = '';
+                          }
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="media-upload-orb">
+                        <ImageIcon size={19} />
+                      </span>
+                      <span>
+                        <strong>Add a polished visual</strong>
+                        <em>JPEG, PNG, WebP or AVIF. Optimized before storage.</em>
+                      </span>
+                    </>
+                  )}
+                </span>
+              </label>
+              <div className="composer-modal-footer">
+                <span>{body.length}/1000</span>
+                {error ? <strong role="alert">{error}</strong> : null}
+                <motion.button
+                  className="primary-action"
+                  type="button"
+                  onClick={submit}
+                  disabled={submitting || !body.trim() || !recipientUsername}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  {submitting ? (imageFile ? 'Optimizing...' : 'Sharing...') : 'Share memory'} <Send size={17} />
+                </motion.button>
+              </div>
+            </motion.section>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
+  );
+}
+
 function ProfileToken({
   profile,
   active,
@@ -484,11 +759,16 @@ function MemoryHeartButton({ memoryId, count, label, className = '' }: { memoryI
     [],
   );
 
+  const favorite = () => {
+    bumpHeart(memoryId);
+    void fetch(`/api/memories/${encodeURIComponent(memoryId)}/heart`, { method: 'POST' }).catch(() => undefined);
+  };
+
   return (
     <motion.button
       className={`heart-button ${className}`.trim()}
       type="button"
-      onClick={() => bumpHeart(memoryId)}
+      onClick={favorite}
       aria-label={label}
       whileHover={{ scale: 1.065, y: -3 }}
       whileTap={{ scale: 0.9 }}
@@ -750,6 +1030,10 @@ function CompactComment({ comment }: { comment: Comment }) {
   const bumpCount = useMemoryStore((state) => state.commentFavs[comment.id] || 0);
   const bumpCommentFav = useMemoryStore((state) => state.bumpCommentFav);
   const favs = comment.favCount + bumpCount;
+  const favorite = () => {
+    bumpCommentFav(comment.id);
+    void fetch(`/api/comments/${encodeURIComponent(comment.id)}/favorite`, { method: 'POST' }).catch(() => undefined);
+  };
 
   return (
     <div className="comment-item">
@@ -763,7 +1047,7 @@ function CompactComment({ comment }: { comment: Comment }) {
           {comment.profile.role}
         </span>
         <p>{comment.body}</p>
-        <button className="comment-fav compact" type="button" onClick={() => bumpCommentFav(comment.id)}>
+        <button className="comment-fav compact" type="button" onClick={favorite}>
           <ThumbsUp size={13} />
           {formatNumber(favs)}
         </button>
@@ -866,19 +1150,14 @@ function MemoryTimeline({ memories }: { memories: Memory[] }) {
   );
 }
 
-const CommentThreadPanel = forwardRef<HTMLElement, { memory: Memory }>(function CommentThreadPanel({ memory }, ref) {
+const CommentThreadPanel = forwardRef<HTMLElement, { memory: Memory; onDirectoryChange: (directory: Directory) => void }>(
+function CommentThreadPanel({ memory, onDirectoryChange }, ref) {
   const [sortMode, setSortMode] = useState<'relevant' | 'recent'>('relevant');
   const sortedComments = useMemo(() => sortComments(memory.comments, sortMode), [memory.comments, sortMode]);
 
   return (
     <section className="thread-panel" ref={ref} aria-label="Memory comments">
-      <div className="comment-composer" aria-label="Add a comment preview">
-        <span>Add a comment</span>
-        <div>
-          <Sparkles size={17} />
-          <BookOpen size={17} />
-        </div>
-      </div>
+      <CommentComposerForm memoryId={memory.id} onDirectoryChange={onDirectoryChange} />
       <LikeStrip profiles={memory.likedBy} overflowCount={Math.max(0, memory.heartCount - memory.likedBy.length)} />
       <div className="thread-toolbar">
         <button
@@ -901,17 +1180,91 @@ const CommentThreadPanel = forwardRef<HTMLElement, { memory: Memory }>(function 
       </div>
       <div className="thread-list">
         {sortedComments.map((comment) => (
-          <CommentThread key={comment.id} comment={comment} depth={0} />
+          <CommentThread
+            key={comment.id}
+            comment={comment}
+            depth={0}
+            memoryId={memory.id}
+            onDirectoryChange={onDirectoryChange}
+          />
         ))}
       </div>
     </section>
   );
 });
 
-function CommentThread({ comment, depth }: { comment: Comment; depth: number }) {
+function CommentComposerForm({
+  memoryId,
+  parentId,
+  onDirectoryChange,
+  compact = false,
+  onDone,
+}: {
+  memoryId: string;
+  parentId?: string;
+  onDirectoryChange: (directory: Directory) => void;
+  compact?: boolean;
+  onDone?: () => void;
+}) {
+  const [body, setBody] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const nextDirectory = await postJson<Directory>('/api/comments', { memoryId, parentId, body });
+      onDirectoryChange(nextDirectory);
+      setBody('');
+      onDone?.();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Could not publish comment.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className={`comment-composer ${compact ? 'comment-composer-compact' : ''}`.trim()}>
+      <textarea
+        value={body}
+        onChange={(event) => setBody(event.target.value)}
+        rows={compact ? 2 : 3}
+        maxLength={700}
+        placeholder={parentId ? 'Reply with context...' : 'Add a thoughtful comment'}
+      />
+      <div>
+        <span>{body.length}/700</span>
+        {error ? <strong role="alert">{error}</strong> : null}
+        <motion.button type="button" onClick={submit} disabled={submitting || !body.trim()} whileTap={{ scale: 0.94 }}>
+          {submitting ? 'Posting...' : parentId ? 'Reply' : 'Comment'} <Send size={15} />
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+function CommentThread({
+  comment,
+  depth,
+  memoryId,
+  onDirectoryChange,
+}: {
+  comment: Comment;
+  depth: number;
+  memoryId: string;
+  onDirectoryChange: (directory: Directory) => void;
+}) {
   const bumpCount = useMemoryStore((state) => state.commentFavs[comment.id] || 0);
   const bumpCommentFav = useMemoryStore((state) => state.bumpCommentFav);
+  const [replying, setReplying] = useState(false);
   const favs = comment.favCount + bumpCount;
+  const favorite = () => {
+    bumpCommentFav(comment.id);
+    void fetch(`/api/comments/${encodeURIComponent(comment.id)}/favorite`, { method: 'POST' }).catch(() => undefined);
+  };
 
   return (
     <motion.article
@@ -936,7 +1289,7 @@ function CommentThread({ comment, depth }: { comment: Comment; depth: number }) 
           <motion.button
             className="comment-fav"
             type="button"
-            onClick={() => bumpCommentFav(comment.id)}
+            onClick={favorite}
             whileTap={{ scale: 0.9, rotate: -5 }}
             animate={bumpCount ? { boxShadow: '0 0 0 7px rgba(255, 79, 131, 0)' } : undefined}
             transition={{ duration: 0.42 }}
@@ -958,13 +1311,41 @@ function CommentThread({ comment, depth }: { comment: Comment; depth: number }) 
               ) : null}
             </AnimatePresence>
           </motion.button>
+          <button className="thread-reply" type="button" onClick={() => setReplying((current) => !current)}>
+            Reply
+          </button>
           <span>{comment.replies.length} replies</span>
           <MiniLikeStrip profiles={comment.likedBy} />
         </div>
+        <AnimatePresence>
+          {replying ? (
+            <motion.div
+              className="reply-composer-wrap"
+              initial={{ opacity: 0, y: -8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -8, height: 0 }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <CommentComposerForm
+                memoryId={memoryId}
+                parentId={comment.id}
+                compact
+                onDirectoryChange={onDirectoryChange}
+                onDone={() => setReplying(false)}
+              />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
         {comment.replies.length > 0 ? (
           <div className="thread-replies">
             {comment.replies.map((reply) => (
-              <CommentThread key={reply.id} comment={reply} depth={depth + 1} />
+              <CommentThread
+                key={reply.id}
+                comment={reply}
+                depth={depth + 1}
+                memoryId={memoryId}
+                onDirectoryChange={onDirectoryChange}
+              />
             ))}
           </div>
         ) : null}
@@ -987,7 +1368,7 @@ function MiniLikeStrip({ profiles }: { profiles: Profile[] }) {
   );
 }
 
-function MemoryStackDialog({ memories }: { memories: Memory[] }) {
+function MemoryStackDialog({ memories, onDirectoryChange }: { memories: Memory[]; onDirectoryChange: (directory: Directory) => void }) {
   const modalOpen = useMemoryStore((state) => state.modalOpen);
   const modalFocus = useMemoryStore((state) => state.modalFocus);
   const stackIds = useMemoryStore((state) => state.stackIds);
@@ -1124,7 +1505,7 @@ function MemoryStackDialog({ memories }: { memories: Memory[] }) {
                   <span>{formatDate(active.createdAt)}</span>
                   <span>{countComments(active.comments)} comments</span>
                 </div>
-                <CommentThreadPanel memory={active} ref={commentsRef} />
+                <CommentThreadPanel memory={active} onDirectoryChange={onDirectoryChange} ref={commentsRef} />
               </div>
             </motion.article>
           </AnimatePresence>
@@ -1237,6 +1618,38 @@ function scrollRail(direction: -1 | 1) {
   }
 
   rail.scrollBy({ left: direction * Math.max(320, rail.clientWidth * 0.72), behavior: 'smooth' });
+}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(typeof payload?.error === 'string' ? payload.error : 'Request failed.');
+  }
+
+  return payload as T;
+}
+
+async function uploadImage(file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const response = await fetch('/api/images', {
+    method: 'POST',
+    body: formData,
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(typeof payload?.error === 'string' ? payload.error : 'Image upload failed.');
+  }
+
+  return payload as { url: string };
 }
 
 function trackPointerGlow(event: PointerEvent<HTMLElement>) {

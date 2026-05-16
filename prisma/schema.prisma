@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts      Account[]
+  sessions      Session[]
+  profile       Profile?
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  name      String
+  image     String   @default("")
+  role      String   @default("Professional")
+  userId    String?  @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authoredMemories  Memory[]           @relation("MemoryAuthor")
+  receivedMemories  Memory[]           @relation("MemoryRecipient")
+  coAuthored        MemoryCoAuthor[]
+  comments          Comment[]
+  memoryLikes       MemoryLike[]
+  commentLikes      CommentLike[]
+  uploadedImages    ImageAsset[]
+
+  @@index([role])
+  @@map("profiles")
+}
+
+model ImageAsset {
+  id              String   @id @default(cuid())
+  uploaderId      String   @map("uploader_id")
+  mimeType        String   @default("image/webp") @map("mime_type")
+  data            Bytes
+  byteSize        Int      @map("byte_size")
+  originalByteSize Int     @default(0) @map("original_byte_size")
+  width           Int
+  height          Int
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  uploader Profile @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([uploaderId])
+  @@map("image_assets")
+}
+
+model Memory {
+  id          String   @id
+  authorId    String   @map("author_id")
+  recipientId String   @map("recipient_id")
+  shoutout    String
+  body        String   @db.Text
+  image       String   @default("")
+  heartCount  Int      @default(0) @map("heart_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  order       Int      @default(0)
+
+  author        Profile          @relation("MemoryAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  recipient     Profile          @relation("MemoryRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  coAuthors     MemoryCoAuthor[]
+  galleryImages GalleryImage[]
+  comments      Comment[]
+  likedBy       MemoryLike[]
+
+  @@index([createdAt])
+  @@index([recipientId])
+  @@index([authorId])
+  @@map("memories")
+}
+
+model MemoryCoAuthor {
+  id        String   @id @default(cuid())
+  memoryId  String   @map("memory_id")
+  profileId String   @map("profile_id")
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  memory  Memory  @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([memoryId, profileId])
+  @@index([profileId])
+  @@map("memory_coauthors")
+}
+
+model GalleryImage {
+  id        String   @id @default(cuid())
+  memoryId  String   @map("memory_id")
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@unique([memoryId, order])
+  @@map("gallery_images")
+}
+
+model Comment {
+  id        String   @id
+  memoryId  String   @map("memory_id")
+  profileId String   @map("profile_id")
+  parentId  String?  @map("parent_id")
+  body      String   @db.Text
+  favCount  Int      @default(0) @map("fav_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  order     Int      @default(0)
+
+  memory  Memory        @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  profile Profile       @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("CommentReplies")
+  likedBy CommentLike[]
+
+  @@index([memoryId])
+  @@index([profileId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model MemoryLike {
+  id        String   @id @default(cuid())
+  memoryId  String   @map("memory_id")
+  profileId String   @map("profile_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  memory  Memory  @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([memoryId, profileId])
+  @@index([profileId])
+  @@map("memory_likes")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String   @map("comment_id")
+  profileId String   @map("profile_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, profileId])
+  @@index([profileId])
+  @@map("comment_likes")
+}
